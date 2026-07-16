@@ -30,6 +30,13 @@ const fallbackQuote = {
   isFallback: true,
 };
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Cache-Control": "no-store",
+};
+
 const parseNumber = (value?: string) => {
   if (!value || value === "-" || value === "0.0000") {
     return 0;
@@ -97,9 +104,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(buildQuote(message), {
-      headers: {
-        "Cache-Control": "no-store",
-      },
+      headers: corsHeaders,
     });
   } catch {
     return NextResponse.json(
@@ -109,10 +114,15 @@ export async function GET(request: NextRequest) {
         market,
       },
       {
-        headers: {
-          "Cache-Control": "no-store",
-        },
+        headers: corsHeaders,
       },
     );
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: corsHeaders,
+  });
 }

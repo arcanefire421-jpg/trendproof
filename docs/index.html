@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TrendProof | 台股漲跌預測比賽</title>
+    <meta name="description" content="台股看漲看跌預測比賽，用市價驗證命中率。" />
+    <style>
+      :root {
+        --background: #f7f7f2;
+        --foreground: #151713;
+        --muted: #666a5f;
+        --line: #d9ded1;
+        --ink: #20251e;
+        --rise: #0b8f6a;
+        --fall: #cf3c3c;
+        --amber: #d9931e;
+        --blue: #2f5f9f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background:
+          linear-gradient(135deg, rgba(11, 143, 106, 0.14), transparent 34%),
+          linear-gradient(225deg, rgba(47, 95, 159, 0.16), transparent 38%),
+          var(--background);
+        color: var(--foreground);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      a { color: inherit; text-decoration: none; }
+      button, input, select { font: inherit; }
+      .wrap { width: min(1180px, calc(100vw - 32px)); margin: 0 auto; }
+      .topbar { display: flex; align-items: center; justify-content: space-between; padding: 24px 0 38px; }
+      .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; }
+      .brand-mark { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 8px; background: var(--ink); color: #f9f3df; font-size: 13px; }
+      .nav { display: flex; gap: 18px; align-items: center; color: var(--muted); font-size: 14px; }
+      .nav a:last-child, .primary { min-height: 44px; padding: 0 18px; border-radius: 8px; background: var(--ink); color: white; display: inline-flex; align-items: center; font-weight: 800; }
+      .hero { display: grid; grid-template-columns: minmax(0, 1.06fr) minmax(360px, 0.74fr); gap: 36px; align-items: center; min-height: 75vh; }
+      .eyebrow, .kicker { margin: 0 0 12px; color: var(--blue); font-size: 13px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+      h1 { margin: 0 0 24px; max-width: 760px; font-size: clamp(46px, 8vw, 90px); line-height: 0.95; }
+      h2 { margin: 0; font-size: 26px; }
+      h3, p { margin-top: 0; }
+      .lead { max-width: 660px; color: #41473e; font-size: 18px; line-height: 1.8; }
+      .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
+      .secondary { min-height: 44px; padding: 0 18px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.65); display: inline-flex; align-items: center; font-weight: 800; }
+      .panel, .card, .player, .step { border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.86); box-shadow: 0 24px 70px rgba(44, 51, 40, 0.08); }
+      .panel { padding: 24px; }
+      .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+      .status { padding: 8px 10px; border-radius: 999px; font-size: 13px; font-weight: 900; }
+      .status.hit { background: rgba(11, 143, 106, .12); color: var(--rise); }
+      .status.miss { background: rgba(207, 60, 60, .12); color: var(--fall); }
+      label { display: grid; gap: 8px; margin: 14px 0; color: var(--muted); font-size: 13px; font-weight: 800; }
+      input, select { width: 100%; min-height: 46px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcf7; color: var(--foreground); padding: 0 12px; outline: none; }
+      input[type="range"] { padding: 0; accent-color: var(--blue); }
+      .segmented { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
+      .direction { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .segmented button, .direction button { min-height: 46px; border: 1px solid var(--line); border-radius: 8px; background: #fbfcf7; color: var(--muted); cursor: pointer; font-weight: 900; }
+      .segmented button.active { border-color: var(--ink); background: var(--ink); color: white; }
+      .direction .selected.rise { border-color: var(--rise); background: rgba(11,143,106,.12); color: var(--rise); }
+      .direction .selected.fall { border-color: var(--fall); background: rgba(207,60,60,.12); color: var(--fall); }
+      .score { display: grid; gap: 12px; margin-top: 18px; padding: 16px; border-radius: 8px; background: var(--ink); color: white; }
+      .score div { display: flex; align-items: baseline; justify-content: space-between; }
+      .score span, .score p { color: #cfd8c7; }
+      .score strong { font-size: 48px; line-height: 1; }
+      .score p, .score small { margin: 0; line-height: 1.6; }
+      .score small { color: #aebca7; }
+      .metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--line); margin: 28px auto; }
+      .metrics div { display: grid; gap: 6px; padding: 22px; background: white; }
+      .metrics span { color: var(--muted); font-size: 13px; }
+      .metrics strong { font-size: 30px; }
+      .workspace { display: grid; grid-template-columns: 1.1fr .9fr; gap: 20px; padding: 36px 0; }
+      .card { padding: 24px; }
+      .heading { display: flex; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
+      .timeline { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; min-height: 260px; align-items: end; padding-top: 28px; }
+      .tick { display: grid; gap: 10px; justify-items: center; color: var(--muted); }
+      .bar { width: 100%; min-height: 44px; border-radius: 8px 8px 2px 2px; background: linear-gradient(180deg, var(--rise), var(--blue)); }
+      .tick strong { color: var(--foreground); }
+      .source { margin: 20px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+      .dist { display: grid; gap: 18px; padding-top: 18px; }
+      .dist-row { display: grid; grid-template-columns: 52px 1fr 44px; gap: 10px; align-items: center; font-size: 14px; }
+      .track { height: 12px; overflow: hidden; border-radius: 999px; background: #e8ecdf; }
+      .track span { display: block; height: 100%; border-radius: inherit; }
+      .track .rise { background: var(--rise); }
+      .track .fall { background: var(--fall); }
+      .section { padding: 56px 0; }
+      .leaderboard { display: grid; gap: 12px; }
+      .player { display: flex; align-items: center; gap: 18px; padding: 18px; }
+      .rank { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 8px; background: #edf4e6; color: var(--rise); font-weight: 900; }
+      .player-main { flex: 1; }
+      .player-main h3 { margin-bottom: 4px; font-size: 20px; }
+      .player-main p { margin: 0; color: var(--muted); }
+      .stats { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+      .stats span { padding: 8px 10px; border-radius: 8px; background: #f2f4ed; font-weight: 800; }
+      .steps { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+      .step { padding: 20px; }
+      .step span { color: var(--amber); font-weight: 900; }
+      .step h3 { margin: 18px 0 8px; }
+      .step p { margin: 0; color: var(--muted); line-height: 1.65; }
+      @media (max-width: 900px) {
+        .hero, .workspace, .steps { grid-template-columns: 1fr; }
+        .metrics { grid-template-columns: repeat(2,1fr); }
+        .nav a:not(:last-child) { display: none; }
+      }
+      @media (max-width: 640px) {
+        .wrap { width: calc(100vw - 32px); }
+        h1 { font-size: 48px; }
+        .segmented, .direction, .metrics, .timeline { grid-template-columns: 1fr; }
+        .timeline { min-height: auto; }
+        .bar { height: 18px !important; }
+        .tick { grid-template-columns: 58px 1fr 72px; justify-items: stretch; align-items: center; }
+        .player { align-items: flex-start; flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="topbar wrap">
+      <div class="brand"><span class="brand-mark">TP</span><span>TrendProof</span></div>
+      <div class="nav"><a href="#leaderboard">排行榜</a><a href="#method">驗證方式</a><a href="#play">開始預測</a></div>
+    </nav>
+
+    <main>
+      <section class="hero wrap">
+        <div>
+          <p class="eyebrow">台股漲跌預測比賽</p>
+          <h1>讓每一次漲跌判斷，都能被市價驗證。</h1>
+          <p class="lead">分享預測房間給朋友、客戶或社群。每位玩家只要在指定時間前選擇看漲或看跌，系統到驗證時間用台股市價計算命中率、離散度與排行榜。</p>
+          <div class="actions"><a class="primary" href="#play">開始預測</a><a class="secondary" href="#leaderboard">查看示範排行</a></div>
+        </div>
+        <section class="panel" id="play" aria-label="提交預測">
+          <div class="panel-head">
+            <div><p class="kicker">今日預測</p><h2>提交你的漲跌判斷</h2></div>
+            <span id="status" class="status hit">方向命中</span>
+          </div>
+          <label>股票代號 <input id="symbol" inputmode="numeric" maxlength="6" value="2330" /></label>
+          <label>市場 <select id="market"><option value="tse">上市</option><option value="otc">上櫃</option></select></label>
+          <div class="segmented" aria-label="預測時段">
+            <button class="active" data-session="open30">開盤 30 分鐘</button>
+            <button data-session="intraday">盤中趨勢</button>
+            <button data-session="close">收盤趨勢</button>
+          </div>
+          <div class="direction" aria-label="漲跌預測">
+            <button id="up" class="rise selected">漲</button>
+            <button id="down" class="fall">跌</button>
+          </div>
+          <label>信心分數 <span id="confidenceLabel">72</span><input id="confidence" type="range" min="1" max="100" value="72" /></label>
+          <div class="score">
+            <div><span>漲跌方向分數</span><strong id="score">93</strong></div>
+            <p id="scoreText">台積電 2330 現價 2470.0，相對開盤上漲。你的預測是看漲。</p>
+            <small id="quoteStatus">準備讀取台股行情</small>
+          </div>
+        </section>
+      </section>
+
+      <section class="metrics wrap">
+        <div><span>今日參賽</span><strong>1,284</strong></div>
+        <div><span>已驗證預測</span><strong>38,920</strong></div>
+        <div><span>平均離散度</span><strong>0.37</strong></div>
+        <div><span>最佳月命中率</span><strong>69%</strong></div>
+      </section>
+
+      <section class="workspace wrap">
+        <div class="card">
+          <div class="heading"><div><p class="kicker">市價驗證</p><h2>時間流動後，讓市場自動判分</h2></div></div>
+          <div id="timeline" class="timeline"></div>
+          <p id="source" class="source">資料來源：台股行情 API。正式結算時會保存每筆預測的提交時間與驗證價格。</p>
+        </div>
+        <div class="card">
+          <div class="heading"><div><p class="kicker">離散度</p><h2>看出共識，也看出分歧</h2></div></div>
+          <div class="dist">
+            <div class="dist-row"><span>強漲</span><div class="track"><span class="rise" style="width:31.5%"></span></div><strong>18%</strong></div>
+            <div class="dist-row"><span>小漲</span><div class="track"><span class="rise" style="width:59.5%"></span></div><strong>34%</strong></div>
+            <div class="dist-row"><span>小跌</span><div class="track"><span class="fall" style="width:50.75%"></span></div><strong>29%</strong></div>
+            <div class="dist-row"><span>強跌</span><div class="track"><span class="fall" style="width:33.25%"></span></div><strong>19%</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section wrap" id="leaderboard">
+        <div class="heading"><div><p class="kicker">每日、每週、每月比賽</p><h2>命中率排行榜</h2></div></div>
+        <div class="leaderboard">
+          <article class="player"><div class="rank">#1</div><div class="player-main"><h3>Mia</h3><p>連續命中 6 次，離散度 0.28</p></div><div class="stats"><span>日 82%</span><span>週 74%</span><span>月 69%</span></div></article>
+          <article class="player"><div class="rank">#2</div><div class="player-main"><h3>Allen</h3><p>連續命中 4 次，離散度 0.34</p></div><div class="stats"><span>日 76%</span><span>週 71%</span><span>月 66%</span></div></article>
+          <article class="player"><div class="rank">#3</div><div class="player-main"><h3>Kai</h3><p>連續命中 3 次，離散度 0.41</p></div><div class="stats"><span>日 71%</span><span>週 68%</span><span>月 64%</span></div></article>
+        </div>
+      </section>
+
+      <section class="section wrap" id="method">
+        <div class="heading"><div><p class="kicker">產品流程</p><h2>從分享網址到驗證排行</h2></div></div>
+        <div class="steps">
+          <div class="step"><span>01</span><h3>建立房間</h3><p>選擇股票、日期與比賽時段，產生可分享連結。</p></div>
+          <div class="step"><span>02</span><h3>提交預測</h3><p>每位玩家只提交看漲或看跌，也可加上信心分數。</p></div>
+          <div class="step"><span>03</span><h3>市價驗證</h3><p>到達開盤 30 分鐘、盤中或收盤節點，自動比對漲跌方向。</p></div>
+          <div class="step"><span>04</span><h3>排行與分享</h3><p>每天、每週、每月產生命中率、離散度與玩家排行。</p></div>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const API_BASE = "https://trendproof.anysimn.chatgpt.site/api/tw-stock";
+      const fallbackQuote = { symbol: "2330", name: "台積電", market: "tse", price: 2470, open: 2430, high: 2470, low: 2420, previousClose: 2440, volume: 27573, date: "20260716", time: "13:30:00", source: "示範資料", isFallback: true };
+      const state = { quote: fallbackQuote, direction: "up", confidence: 72 };
+      const el = (id) => document.getElementById(id);
+      function render() {
+        const q = state.quote;
+        const latest = q.price || q.previousClose;
+        const open = q.open || q.previousClose;
+        const actual = latest >= open ? "up" : "down";
+        const hit = state.direction === actual;
+        const score = Math.min(100, (hit ? 75 : 0) + (hit ? Math.round(state.confidence * 0.25) : Math.round((100 - state.confidence) * 0.1)));
+        el("status").className = "status " + (hit ? "hit" : "miss");
+        el("status").textContent = hit ? "方向命中" : "方向未命中";
+        el("score").textContent = score;
+        el("scoreText").textContent = `${q.name} ${q.symbol} 現價 ${latest.toFixed(1)}，相對開盤${actual === "up" ? "上漲" : "下跌"}。你的預測是${state.direction === "up" ? "看漲" : "看跌"}。`;
+        el("quoteStatus").textContent = `${q.isFallback ? "使用備援示範資料" : "已讀取行情"}；資料時間 ${q.date || ""} ${q.time || ""}`;
+        el("source").textContent = `資料來源：${q.source}。正式結算時會保存每筆預測的提交時間與驗證價格。`;
+        const ticks = [{ time: "前收", price: q.previousClose }, { time: "開盤", price: q.open }, { time: "最低", price: q.low }, { time: q.time || "現價", price: latest }];
+        el("timeline").innerHTML = ticks.map((tick, i) => `<div class="tick"><span>${tick.time}</span><div class="bar" style="height:${Math.max(36, 36 + (tick.price - q.low) * 1.6 + i * 6)}px"></div><strong>${tick.price.toFixed(1)}</strong></div>`).join("");
+      }
+      async function loadQuote() {
+        const symbol = el("symbol").value.replace(/\D/g, "").slice(0, 6);
+        if (symbol.length < 4) return;
+        try {
+          el("quoteStatus").textContent = "讀取台股行情中";
+          const market = el("market").value;
+          const res = await fetch(`${API_BASE}?symbol=${symbol}&market=${market}`, { cache: "no-store" });
+          if (!res.ok) throw new Error("quote failed");
+          state.quote = await res.json();
+        } catch {
+          state.quote = { ...fallbackQuote, symbol: symbol || "2330", market: el("market").value };
+        }
+        render();
+      }
+      document.querySelectorAll(".segmented button").forEach((button) => button.addEventListener("click", () => {
+        document.querySelectorAll(".segmented button").forEach((b) => b.classList.remove("active"));
+        button.classList.add("active");
+      }));
+      el("up").addEventListener("click", () => { state.direction = "up"; el("up").classList.add("selected"); el("down").classList.remove("selected"); render(); });
+      el("down").addEventListener("click", () => { state.direction = "down"; el("down").classList.add("selected"); el("up").classList.remove("selected"); render(); });
+      el("confidence").addEventListener("input", (event) => { state.confidence = Number(event.target.value); el("confidenceLabel").textContent = state.confidence; render(); });
+      el("symbol").addEventListener("change", loadQuote);
+      el("market").addEventListener("change", loadQuote);
+      render();
+      loadQuote();
+    </script>
+  </body>
+</html>
