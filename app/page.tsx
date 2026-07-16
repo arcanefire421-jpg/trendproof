@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Direction = "up" | "down";
 type Session = "open30" | "intraday" | "close";
@@ -12,17 +12,42 @@ const players = [
   { name: "Nora", day: 67, week: 65, month: 61, spread: 0.47, streak: 2 },
 ];
 
-const marketTicks = [
-  { time: "09:00", price: 614.5 },
-  { time: "09:30", price: 621.0 },
-  { time: "11:00", price: 618.5 },
-  { time: "13:30", price: 626.0 },
-];
-
 const sessions: Record<Session, string> = {
   open30: "開盤 30 分鐘",
   intraday: "盤中趨勢",
   close: "收盤趨勢",
+};
+
+type Quote = {
+  symbol: string;
+  name: string;
+  market: string;
+  price: number;
+  open: number;
+  high: number;
+  low: number;
+  previousClose: number;
+  volume: number;
+  date: string;
+  time: string;
+  source: string;
+  isFallback?: boolean;
+};
+
+const fallbackQuote: Quote = {
+  symbol: "2330",
+  name: "台積電",
+  market: "tse",
+  price: 2470,
+  open: 2430,
+  high: 2470,
+  low: 2420,
+  previousClose: 2440,
+  volume: 27573,
+  date: "20260716",
+  time: "13:30:00",
+  source: "示範資料",
+  isFallback: true,
 };
 
 const dispersion = [
@@ -33,18 +58,60 @@ const dispersion = [
 ];
 
 export default function Home() {
-  const [symbol, setSymbol] = useState("TSM");
+  const [symbol, setSymbol] = useState("2330");
+  const [market, setMarket] = useState("tse");
   const [session, setSession] = useState<Session>("open30");
   const [direction, setDirection] = useState<Direction>("up");
-  const [entry, setEntry] = useState("615");
-  const [exit, setExit] = useState("628");
+  const [entry, setEntry] = useState("2450");
+  const [exit, setExit] = useState("2480");
   const [confidence, setConfidence] = useState(72);
+  const [quote, setQuote] = useState<Quote>(fallbackQuote);
+  const [quoteStatus, setQuoteStatus] = useState("準備讀取台股行情");
 
-  const latest = marketTicks[marketTicks.length - 1].price;
-  const open = marketTicks[0].price;
+  useEffect(() => {
+    const controller = new AbortController();
+    const cleanSymbol = symbol.replace(/\D/g, "").slice(0, 6);
+
+    if (cleanSymbol.length < 4) {
+      setQuoteStatus("請輸入 4 位數股票代號");
+      return () => controller.abort();
+    }
+
+    setQuoteStatus("讀取台股行情中");
+    fetch(`/api/tw-stock?symbol=${cleanSymbol}&market=${market}`, {
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("quote request failed");
+        }
+        return response.json() as Promise<Quote>;
+      })
+      .then((nextQuote) => {
+        setQuote(nextQuote);
+        setQuoteStatus(nextQuote.isFallback ? "使用備援示範資料" : "已接入台股行情");
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          setQuote(fallbackQuote);
+          setQuoteStatus("行情暫時無法讀取，使用備援示範資料");
+        }
+      });
+
+    return () => controller.abort();
+  }, [market, symbol]);
+
+  const latest = quote.price || quote.previousClose;
+  const open = quote.open || quote.previousClose;
   const actualDirection: Direction = latest >= open ? "up" : "down";
   const entryGap = Math.abs(Number(entry) - latest);
   const directionHit = direction === actualDirection;
+  const marketTicks = [
+    { time: "前收", price: quote.previousClose },
+    { time: "開盤", price: quote.open },
+    { time: "最低", price: quote.low },
+    { time: quote.time || "現價", price: latest },
+  ];
 
   const score = useMemo(() => {
     const confidenceWeight = Math.round(confidence * 0.35);
@@ -101,7 +168,20 @@ export default function Home() {
 
             <label>
               股票代號
-              <input value={symbol} onChange={(event) => setSymbol(event.target.value.toUpperCase())} />
+              <input
+                inputMode="numeric"
+                maxLength={6}
+                value={symbol}
+                onChange={(event) => setSymbol(event.target.value.replace(/\D/g, ""))}
+              />
+            </label>
+
+            <label>
+              市場
+              <select value={market} onChange={(event) => setMarket(event.target.value)}>
+                <option value="tse">上市</option>
+                <option value="otc">上櫃</option>
+              </select>
             </label>
 
             <div className="segmented" role="group" aria-label="預測時段">
@@ -163,9 +243,10 @@ export default function Home() {
                 <strong>{score}</strong>
               </div>
               <p>
-                {symbol || "TSM"} 現價 {latest.toFixed(1)}，相對開盤
+                {quote.name} {quote.symbol} 現價 {latest.toFixed(1)}，相對開盤
                 {actualDirection === "up" ? " 上漲" : " 下跌"}。買點距離現價 {entryGap.toFixed(1)}。
               </p>
+              <small>{quoteStatus}；資料時間 {quote.date} {quote.time}</small>
             </div>
           </section>
         </div>
@@ -200,11 +281,12 @@ export default function Home() {
             {marketTicks.map((tick, index) => (
               <div className="tick" key={tick.time}>
                 <span>{tick.time}</span>
-                <div className="bar" style={{ height: `${36 + index * 16}px` }} />
+                <div className="bar" style={{ height: `${Math.max(36, 36 + (tick.price - quote.low) * 1.6 + index * 6)}px` }} />
                 <strong>{tick.price.toFixed(1)}</strong>
               </div>
             ))}
           </div>
+          <p className="data-source">資料來源：{quote.source}。正式結算時會保存每筆預測的提交時間與驗證價格。</p>
         </div>
 
         <div className="dispersion-card">

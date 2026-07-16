@@ -41,7 +41,8 @@ a {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -239,7 +240,8 @@ label {
   font-weight: 700;
 }
 
-input {
+input,
+select {
   width: 100%;
   min-height: 46px;
   border: 1px solid var(--line);
@@ -250,7 +252,8 @@ input {
   outline: none;
 }
 
-input:focus {
+input:focus,
+select:focus {
   border-color: var(--blue);
   box-shadow: 0 0 0 4px rgba(47, 95, 159, 0.12);
 }
@@ -337,6 +340,11 @@ input[type="range"] {
   line-height: 1.6;
 }
 
+.score-card small {
+  color: #aebca7;
+  line-height: 1.5;
+}
+
 .metric-strip {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -408,6 +416,13 @@ input[type="range"] {
 
 .tick strong {
   color: var(--foreground);
+}
+
+.data-source {
+  margin: 20px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .dispersion-list {
