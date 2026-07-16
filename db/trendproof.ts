@@ -167,3 +167,12 @@ export async function upsertPrediction(input: {
 
   return result;
 }
+
+export async function deletePrediction(input: { roomId: string; nickname: string }) {
+  await ensureTrendProofData();
+  const db = getD1();
+  await db
+    .prepare("DELETE FROM predictions WHERE room_id = ? AND nickname = ?")
+    .bind(input.roomId, input.nickname.trim().slice(0, 24))
+    .run();
+}
