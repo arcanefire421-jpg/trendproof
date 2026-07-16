@@ -264,8 +264,7 @@ input[type="range"] {
 }
 
 .segmented,
-.direction-grid,
-.price-grid {
+.direction-grid {
   display: grid;
   gap: 8px;
 }
@@ -292,8 +291,7 @@ input[type="range"] {
   color: #ffffff;
 }
 
-.direction-grid,
-.price-grid {
+.direction-grid {
   grid-template-columns: repeat(2, 1fr);
 }
 
@@ -587,7 +585,6 @@ input[type="range"] {
 
   .segmented,
   .direction-grid,
-  .price-grid,
   .metric-strip,
   .timeline {
     grid-template-columns: 1fr;

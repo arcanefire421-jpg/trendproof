@@ -62,8 +62,6 @@ export default function Home() {
   const [market, setMarket] = useState("tse");
   const [session, setSession] = useState<Session>("open30");
   const [direction, setDirection] = useState<Direction>("up");
-  const [entry, setEntry] = useState("2450");
-  const [exit, setExit] = useState("2480");
   const [confidence, setConfidence] = useState(72);
   const [quote, setQuote] = useState<Quote>(fallbackQuote);
   const [quoteStatus, setQuoteStatus] = useState("準備讀取台股行情");
@@ -104,7 +102,6 @@ export default function Home() {
   const latest = quote.price || quote.previousClose;
   const open = quote.open || quote.previousClose;
   const actualDirection: Direction = latest >= open ? "up" : "down";
-  const entryGap = Math.abs(Number(entry) - latest);
   const directionHit = direction === actualDirection;
   const marketTicks = [
     { time: "前收", price: quote.previousClose },
@@ -114,11 +111,10 @@ export default function Home() {
   ];
 
   const score = useMemo(() => {
-    const confidenceWeight = Math.round(confidence * 0.35);
-    const priceWeight = Math.max(0, 35 - Math.round(entryGap * 2));
-    const directionWeight = directionHit ? 30 : 0;
-    return Math.min(100, confidenceWeight + priceWeight + directionWeight);
-  }, [confidence, directionHit, entryGap]);
+    const directionWeight = directionHit ? 75 : 0;
+    const confidenceWeight = directionHit ? Math.round(confidence * 0.25) : Math.round((100 - confidence) * 0.1);
+    return Math.min(100, directionWeight + confidenceWeight);
+  }, [confidence, directionHit]);
 
   return (
     <main className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
@@ -142,8 +138,8 @@ export default function Home() {
             <p className="eyebrow">股市預測準確度競賽平台</p>
             <h1>讓每一次漲跌判斷，都能被市價驗證。</h1>
             <p className="hero-text">
-              分享一個預測房間給朋友、客戶或社群。每位玩家在開盤前、盤中與收盤前提交股價趨勢、買點與賣點，
-              系統用實際市場價格計算命中率、離散度與排行榜。
+              分享一個預測房間給朋友、客戶或社群。每位玩家只要在指定時間前選擇看漲或看跌，
+              系統到驗證時間用實際台股市價計算命中率、離散度與排行榜。
             </p>
             <div className="hero-actions">
               <a className="primary-action" href="#create-room">
@@ -162,7 +158,7 @@ export default function Home() {
                 <h2>提交你的市場判斷</h2>
               </div>
               <span className={directionHit ? "status hit" : "status miss"}>
-                {directionHit ? "目前命中" : "等待修正"}
+                {directionHit ? "方向命中" : "方向未命中"}
               </span>
             </div>
 
@@ -214,17 +210,6 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="price-grid">
-              <label>
-                買點
-                <input inputMode="decimal" value={entry} onChange={(event) => setEntry(event.target.value)} />
-              </label>
-              <label>
-                賣點
-                <input inputMode="decimal" value={exit} onChange={(event) => setExit(event.target.value)} />
-              </label>
-            </div>
-
             <label>
               信心分數 {confidence}
               <input
@@ -239,12 +224,13 @@ export default function Home() {
 
             <div className="score-card">
               <div>
-                <span>即時驗證分數</span>
+                <span>漲跌方向分數</span>
                 <strong>{score}</strong>
               </div>
               <p>
                 {quote.name} {quote.symbol} 現價 {latest.toFixed(1)}，相對開盤
-                {actualDirection === "up" ? " 上漲" : " 下跌"}。買點距離現價 {entryGap.toFixed(1)}。
+                {actualDirection === "up" ? " 上漲" : " 下跌"}。你的預測是
+                {direction === "up" ? " 看漲" : " 看跌"}。
               </p>
               <small>{quoteStatus}；資料時間 {quote.date} {quote.time}</small>
             </div>
@@ -345,12 +331,12 @@ export default function Home() {
           <div>
             <span>02</span>
             <h3>提交預測</h3>
-            <p>每位玩家輸入漲跌方向、信心分數、買點與賣點。</p>
+            <p>每位玩家只提交看漲或看跌，也可加上信心分數。</p>
           </div>
           <div>
             <span>03</span>
             <h3>市價驗證</h3>
-            <p>到達開盤 30 分鐘、盤中或收盤節點，自動比對市場價格。</p>
+            <p>到達開盤 30 分鐘、盤中或收盤節點，自動比對漲跌方向。</p>
           </div>
           <div>
             <span>04</span>
