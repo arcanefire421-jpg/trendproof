@@ -5,6 +5,19 @@ import { useEffect, useMemo, useState } from "react";
 type Direction = "up" | "down";
 type Session = "open30" | "intraday" | "close";
 
+type Room = {
+  id: string;
+  title: string;
+  symbol: string;
+  market: "tse" | "otc";
+  session: Session;
+  deadline: string;
+  verifyAt: string;
+  joined: number;
+  bullish: number;
+  bearish: number;
+};
+
 const players = [
   { name: "Mia", day: 82, week: 74, month: 69, spread: 0.28, streak: 6 },
   { name: "Allen", day: 76, week: 71, month: 66, spread: 0.34, streak: 4 },
@@ -17,6 +30,45 @@ const sessions: Record<Session, string> = {
   intraday: "盤中趨勢",
   close: "收盤趨勢",
 };
+
+const rooms: Room[] = [
+  {
+    id: "2330-open30",
+    title: "台積電開盤 30 分鐘",
+    symbol: "2330",
+    market: "tse",
+    session: "open30",
+    deadline: "09:00 截止",
+    verifyAt: "09:30 驗證",
+    joined: 128,
+    bullish: 68,
+    bearish: 32,
+  },
+  {
+    id: "2317-intraday",
+    title: "鴻海盤中方向戰",
+    symbol: "2317",
+    market: "tse",
+    session: "intraday",
+    deadline: "11:30 截止",
+    verifyAt: "13:00 驗證",
+    joined: 84,
+    bullish: 54,
+    bearish: 46,
+  },
+  {
+    id: "2454-close",
+    title: "聯發科收盤預測",
+    symbol: "2454",
+    market: "tse",
+    session: "close",
+    deadline: "13:00 截止",
+    verifyAt: "收盤驗證",
+    joined: 96,
+    bullish: 41,
+    bearish: 59,
+  },
+];
 
 type Quote = {
   symbol: string;
@@ -58,13 +110,26 @@ const dispersion = [
 ];
 
 export default function Home() {
-  const [symbol, setSymbol] = useState("2330");
-  const [market, setMarket] = useState("tse");
-  const [session, setSession] = useState<Session>("open30");
+  const [activeRoom, setActiveRoom] = useState<Room>(rooms[0]);
+  const [symbol, setSymbol] = useState(rooms[0].symbol);
+  const [market, setMarket] = useState(rooms[0].market);
+  const [session, setSession] = useState<Session>(rooms[0].session);
   const [direction, setDirection] = useState<Direction>("up");
   const [confidence, setConfidence] = useState(72);
   const [quote, setQuote] = useState<Quote>(fallbackQuote);
   const [quoteStatus, setQuoteStatus] = useState("準備讀取台股行情");
+  const [joinedRooms, setJoinedRooms] = useState<Record<string, Direction>>({});
+
+  const selectRoom = (room: Room) => {
+    setActiveRoom(room);
+    setSymbol(room.symbol);
+    setMarket(room.market);
+    setSession(room.session);
+  };
+
+  const submitPrediction = () => {
+    setJoinedRooms((current) => ({ ...current, [activeRoom.id]: direction }));
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -143,10 +208,10 @@ export default function Home() {
             </p>
             <div className="hero-actions">
               <a className="primary-action" href="#create-room">
-                建立預測房間
+                加入預測房間
               </a>
-              <a className="secondary-action" href="#leaderboard">
-                查看示範排行
+              <a className="secondary-action" href="#rooms">
+                查看正在比賽
               </a>
             </div>
           </div>
@@ -155,7 +220,7 @@ export default function Home() {
             <div className="panel-header">
               <div>
                 <p className="section-kicker">今日預測</p>
-                <h2>提交你的市場判斷</h2>
+                <h2>{activeRoom.title}</h2>
               </div>
               <span className={directionHit ? "status hit" : "status miss"}>
                 {directionHit ? "方向命中" : "方向未命中"}
@@ -174,7 +239,7 @@ export default function Home() {
 
             <label>
               市場
-              <select value={market} onChange={(event) => setMarket(event.target.value)}>
+              <select value={market} onChange={(event) => setMarket(event.target.value as Room["market"])}>
                 <option value="tse">上市</option>
                 <option value="otc">上櫃</option>
               </select>
@@ -234,7 +299,53 @@ export default function Home() {
               </p>
               <small>{quoteStatus}；資料時間 {quote.date} {quote.time}</small>
             </div>
+
+            <button className="submit-prediction" onClick={submitPrediction} type="button">
+              {joinedRooms[activeRoom.id] ? "更新我的預測" : "加入此房間並提交預測"}
+            </button>
+            <p className="submission-note">
+              {joinedRooms[activeRoom.id]
+                ? `你已在此房間提交${joinedRooms[activeRoom.id] === "up" ? "看漲" : "看跌"}。正式版會在截止後鎖定。`
+                : `${activeRoom.deadline}，${activeRoom.verifyAt}。截止前可修改自己的方向。`}
+            </p>
           </section>
+        </div>
+      </section>
+
+      <section className="rooms-section" id="rooms">
+        <div className="section-heading">
+          <div>
+            <p className="section-kicker">正在比賽</p>
+            <h2>選一個房間，直接加入預測</h2>
+          </div>
+        </div>
+        <div className="rooms-grid">
+          {rooms.map((room) => (
+            <button
+              className={activeRoom.id === room.id ? "room-card active" : "room-card"}
+              key={room.id}
+              onClick={() => selectRoom(room)}
+              type="button"
+            >
+              <span className="room-status">進行中</span>
+              <strong>{room.title}</strong>
+              <span>
+                {room.symbol} · {room.market === "tse" ? "上市" : "上櫃"} · {sessions[room.session]}
+              </span>
+              <div className="room-meta">
+                <span>{room.deadline}</span>
+                <span>{room.joined + (joinedRooms[room.id] ? 1 : 0)} 人參加</span>
+              </div>
+              <div className="room-split" aria-label="目前預測分布">
+                <span className="rise" style={{ width: `${room.bullish}%` }} />
+                <span className="fall" style={{ width: `${room.bearish}%` }} />
+              </div>
+              <div className="room-votes">
+                <span>看漲 {room.bullish}%</span>
+                <span>看跌 {room.bearish}%</span>
+              </div>
+            </button>
+          ))}
         </div>
       </section>
 

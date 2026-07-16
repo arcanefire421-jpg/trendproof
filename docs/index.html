@@ -44,6 +44,7 @@
       .actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
       .secondary { min-height: 44px; padding: 0 18px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.65); display: inline-flex; align-items: center; font-weight: 800; }
       .panel, .card, .player, .step { border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.86); box-shadow: 0 24px 70px rgba(44, 51, 40, 0.08); }
+      .room-card { border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.86); box-shadow: 0 24px 70px rgba(44, 51, 40, 0.08); }
       .panel { padding: 24px; }
       .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
       .status { padding: 8px 10px; border-radius: 999px; font-size: 13px; font-weight: 900; }
@@ -64,6 +65,20 @@
       .score strong { font-size: 48px; line-height: 1; }
       .score p, .score small { margin: 0; line-height: 1.6; }
       .score small { color: #aebca7; }
+      .submit-prediction { width: 100%; min-height: 48px; margin-top: 14px; border: 0; border-radius: 8px; background: var(--rise); color: white; cursor: pointer; font-weight: 900; }
+      .submission-note { margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+      .rooms { padding: 34px 0 18px; }
+      .rooms-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+      .room-card { display: grid; gap: 12px; padding: 18px; text-align: left; cursor: pointer; color: var(--foreground); }
+      .room-card.active { border-color: var(--rise); box-shadow: 0 0 0 4px rgba(11,143,106,.12), 0 24px 70px rgba(44, 51, 40, 0.08); }
+      .room-card strong { font-size: 20px; }
+      .room-card > span:not(.room-status) { color: var(--muted); font-size: 14px; }
+      .room-status { width: fit-content; padding: 6px 9px; border-radius: 999px; background: rgba(11,143,106,.12); color: var(--rise); font-size: 12px; font-weight: 900; }
+      .room-meta, .room-votes { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 13px; }
+      .room-split { display: flex; height: 12px; overflow: hidden; border-radius: 999px; background: #e8ecdf; }
+      .room-split span { display: block; height: 100%; }
+      .room-split .rise { background: var(--rise); }
+      .room-split .fall { background: var(--fall); }
       .metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--line); margin: 28px auto; }
       .metrics div { display: grid; gap: 6px; padding: 22px; background: white; }
       .metrics span { color: var(--muted); font-size: 13px; }
@@ -97,7 +112,7 @@
       .step h3 { margin: 18px 0 8px; }
       .step p { margin: 0; color: var(--muted); line-height: 1.65; }
       @media (max-width: 900px) {
-        .hero, .workspace, .steps { grid-template-columns: 1fr; }
+        .hero, .rooms-grid, .workspace, .steps { grid-template-columns: 1fr; }
         .metrics { grid-template-columns: repeat(2,1fr); }
         .nav a:not(:last-child) { display: none; }
       }
@@ -124,11 +139,11 @@
           <p class="eyebrow">台股漲跌預測比賽</p>
           <h1>讓每一次漲跌判斷，都能被市價驗證。</h1>
           <p class="lead">分享預測房間給朋友、客戶或社群。每位玩家只要在指定時間前選擇看漲或看跌，系統到驗證時間用台股市價計算命中率、離散度與排行榜。</p>
-          <div class="actions"><a class="primary" href="#play">開始預測</a><a class="secondary" href="#leaderboard">查看示範排行</a></div>
+          <div class="actions"><a class="primary" href="#play">加入預測房間</a><a class="secondary" href="#rooms">查看正在比賽</a></div>
         </div>
         <section class="panel" id="play" aria-label="提交預測">
           <div class="panel-head">
-            <div><p class="kicker">今日預測</p><h2>提交你的漲跌判斷</h2></div>
+            <div><p class="kicker">今日預測</p><h2 id="roomTitle">台積電開盤 30 分鐘</h2></div>
             <span id="status" class="status hit">方向命中</span>
           </div>
           <label>股票代號 <input id="symbol" inputmode="numeric" maxlength="6" value="2330" /></label>
@@ -148,7 +163,14 @@
             <p id="scoreText">台積電 2330 現價 2470.0，相對開盤上漲。你的預測是看漲。</p>
             <small id="quoteStatus">準備讀取台股行情</small>
           </div>
+          <button class="submit-prediction" id="submitPrediction" type="button">加入此房間並提交預測</button>
+          <p class="submission-note" id="submissionNote">09:00 截止，09:30 驗證。截止前可修改自己的方向。</p>
         </section>
+      </section>
+
+      <section class="rooms wrap" id="rooms">
+        <div class="heading"><div><p class="kicker">正在比賽</p><h2>選一個房間，直接加入預測</h2></div></div>
+        <div class="rooms-grid" id="roomsGrid"></div>
       </section>
 
       <section class="metrics wrap">
@@ -198,7 +220,14 @@
     <script>
       const API_BASE = "https://trendproof.anysimn.chatgpt.site/api/tw-stock";
       const fallbackQuote = { symbol: "2330", name: "台積電", market: "tse", price: 2470, open: 2430, high: 2470, low: 2420, previousClose: 2440, volume: 27573, date: "20260716", time: "13:30:00", source: "示範資料", isFallback: true };
-      const state = { quote: fallbackQuote, direction: "up", confidence: 72 };
+      const rooms = [
+        { id: "2330-open30", title: "台積電開盤 30 分鐘", symbol: "2330", market: "tse", session: "open30", deadline: "09:00 截止", verifyAt: "09:30 驗證", joined: 128, bullish: 68, bearish: 32 },
+        { id: "2317-intraday", title: "鴻海盤中方向戰", symbol: "2317", market: "tse", session: "intraday", deadline: "11:30 截止", verifyAt: "13:00 驗證", joined: 84, bullish: 54, bearish: 46 },
+        { id: "2454-close", title: "聯發科收盤預測", symbol: "2454", market: "tse", session: "close", deadline: "13:00 截止", verifyAt: "收盤驗證", joined: 96, bullish: 41, bearish: 59 }
+      ];
+      const sessionLabels = { open30: "開盤 30 分鐘", intraday: "盤中趨勢", close: "收盤趨勢" };
+      const joinedRooms = {};
+      const state = { quote: fallbackQuote, direction: "up", confidence: 72, room: rooms[0] };
       const el = (id) => document.getElementById(id);
       function render() {
         const q = state.quote;
@@ -210,11 +239,28 @@
         el("status").className = "status " + (hit ? "hit" : "miss");
         el("status").textContent = hit ? "方向命中" : "方向未命中";
         el("score").textContent = score;
+        el("roomTitle").textContent = state.room.title;
         el("scoreText").textContent = `${q.name} ${q.symbol} 現價 ${latest.toFixed(1)}，相對開盤${actual === "up" ? "上漲" : "下跌"}。你的預測是${state.direction === "up" ? "看漲" : "看跌"}。`;
         el("quoteStatus").textContent = `${q.isFallback ? "使用備援示範資料" : "已讀取行情"}；資料時間 ${q.date || ""} ${q.time || ""}`;
+        el("submitPrediction").textContent = joinedRooms[state.room.id] ? "更新我的預測" : "加入此房間並提交預測";
+        el("submissionNote").textContent = joinedRooms[state.room.id] ? `你已在此房間提交${joinedRooms[state.room.id] === "up" ? "看漲" : "看跌"}。正式版會在截止後鎖定。` : `${state.room.deadline}，${state.room.verifyAt}。截止前可修改自己的方向。`;
         el("source").textContent = `資料來源：${q.source}。正式結算時會保存每筆預測的提交時間與驗證價格。`;
         const ticks = [{ time: "前收", price: q.previousClose }, { time: "開盤", price: q.open }, { time: "最低", price: q.low }, { time: q.time || "現價", price: latest }];
         el("timeline").innerHTML = ticks.map((tick, i) => `<div class="tick"><span>${tick.time}</span><div class="bar" style="height:${Math.max(36, 36 + (tick.price - q.low) * 1.6 + i * 6)}px"></div><strong>${tick.price.toFixed(1)}</strong></div>`).join("");
+        renderRooms();
+      }
+      function renderRooms() {
+        el("roomsGrid").innerHTML = rooms.map((room) => `<button class="room-card ${state.room.id === room.id ? "active" : ""}" data-room="${room.id}" type="button"><span class="room-status">進行中</span><strong>${room.title}</strong><span>${room.symbol} · ${room.market === "tse" ? "上市" : "上櫃"} · ${sessionLabels[room.session]}</span><div class="room-meta"><span>${room.deadline}</span><span>${room.joined + (joinedRooms[room.id] ? 1 : 0)} 人參加</span></div><div class="room-split"><span class="rise" style="width:${room.bullish}%"></span><span class="fall" style="width:${room.bearish}%"></span></div><div class="room-votes"><span>看漲 ${room.bullish}%</span><span>看跌 ${room.bearish}%</span></div></button>`).join("");
+        document.querySelectorAll(".room-card").forEach((button) => button.addEventListener("click", () => {
+          const room = rooms.find((item) => item.id === button.dataset.room);
+          if (!room) return;
+          state.room = room;
+          el("symbol").value = room.symbol;
+          el("market").value = room.market;
+          document.querySelectorAll(".segmented button").forEach((b) => b.classList.toggle("active", b.dataset.session === room.session));
+          loadQuote();
+          document.querySelector("#play").scrollIntoView({ behavior: "smooth", block: "start" });
+        }));
       }
       async function loadQuote() {
         const symbol = el("symbol").value.replace(/\D/g, "").slice(0, 6);
@@ -237,6 +283,7 @@
       el("up").addEventListener("click", () => { state.direction = "up"; el("up").classList.add("selected"); el("down").classList.remove("selected"); render(); });
       el("down").addEventListener("click", () => { state.direction = "down"; el("down").classList.add("selected"); el("up").classList.remove("selected"); render(); });
       el("confidence").addEventListener("input", (event) => { state.confidence = Number(event.target.value); el("confidenceLabel").textContent = state.confidence; render(); });
+      el("submitPrediction").addEventListener("click", () => { joinedRooms[state.room.id] = state.direction; render(); });
       el("symbol").addEventListener("change", loadQuote);
       el("market").addEventListener("change", loadQuote);
       render();
