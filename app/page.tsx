@@ -13,6 +13,7 @@ type Room = {
   session: Session;
   deadline: string;
   verifyAt: string;
+  status?: string;
   joined: number;
   bullish: number;
   bearish: number;
@@ -31,7 +32,7 @@ const sessions: Record<Session, string> = {
   close: "收盤趨勢",
 };
 
-const rooms: Room[] = [
+const fallbackRooms: Room[] = [
   {
     id: "2330-open30",
     title: "台積電開盤 30 分鐘",
@@ -110,25 +111,78 @@ const dispersion = [
 ];
 
 export default function Home() {
-  const [activeRoom, setActiveRoom] = useState<Room>(rooms[0]);
-  const [symbol, setSymbol] = useState(rooms[0].symbol);
-  const [market, setMarket] = useState(rooms[0].market);
-  const [session, setSession] = useState<Session>(rooms[0].session);
+  const [rooms, setRooms] = useState<Room[]>(fallbackRooms);
+  const [activeRoom, setActiveRoom] = useState<Room>(fallbackRooms[0]);
+  const [symbol, setSymbol] = useState(fallbackRooms[0].symbol);
+  const [market, setMarket] = useState(fallbackRooms[0].market);
+  const [session, setSession] = useState<Session>(fallbackRooms[0].session);
+  const [nickname, setNickname] = useState("");
   const [direction, setDirection] = useState<Direction>("up");
   const [confidence, setConfidence] = useState(72);
   const [quote, setQuote] = useState<Quote>(fallbackQuote);
   const [quoteStatus, setQuoteStatus] = useState("準備讀取台股行情");
   const [joinedRooms, setJoinedRooms] = useState<Record<string, Direction>>({});
+  const [submissionStatus, setSubmissionStatus] = useState("");
+
+  useEffect(() => {
+    fetch("/api/rooms", { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("rooms request failed");
+        }
+        return response.json() as Promise<{ rooms: Room[] }>;
+      })
+      .then((payload) => {
+        if (!payload.rooms.length) return;
+        setRooms(payload.rooms);
+        const nextActive = payload.rooms.find((room) => room.id === activeRoom.id) ?? payload.rooms[0];
+        setActiveRoom(nextActive);
+      })
+      .catch(() => {
+        setRooms(fallbackRooms);
+      });
+  }, []);
 
   const selectRoom = (room: Room) => {
     setActiveRoom(room);
     setSymbol(room.symbol);
     setMarket(room.market);
     setSession(room.session);
+    setSubmissionStatus("");
   };
 
-  const submitPrediction = () => {
-    setJoinedRooms((current) => ({ ...current, [activeRoom.id]: direction }));
+  const submitPrediction = async () => {
+    const cleanNickname = nickname.trim();
+    if (cleanNickname.length < 2) {
+      setSubmissionStatus("請先輸入至少 2 個字的暱稱。");
+      return;
+    }
+
+    setSubmissionStatus("正在提交預測...");
+    try {
+      const response = await fetch("/api/predictions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomId: activeRoom.id,
+          nickname: cleanNickname,
+          direction,
+          confidence,
+        }),
+      });
+      const payload = (await response.json()) as { rooms?: Room[]; error?: string };
+      if (!response.ok || !payload.rooms) {
+        throw new Error(payload.error ?? "提交失敗");
+      }
+
+      setRooms(payload.rooms);
+      setActiveRoom(payload.rooms.find((room) => room.id === activeRoom.id) ?? activeRoom);
+      setJoinedRooms((current) => ({ ...current, [activeRoom.id]: direction }));
+      setSubmissionStatus("已提交。截止前再次提交會更新你的預測。");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "提交失敗";
+      setSubmissionStatus(message);
+    }
   };
 
   useEffect(() => {
@@ -228,6 +282,16 @@ export default function Home() {
             </div>
 
             <label>
+              暱稱
+              <input
+                maxLength={24}
+                placeholder="輸入你的暱稱"
+                value={nickname}
+                onChange={(event) => setNickname(event.target.value)}
+              />
+            </label>
+
+            <label>
               股票代號
               <input
                 inputMode="numeric"
@@ -304,9 +368,10 @@ export default function Home() {
               {joinedRooms[activeRoom.id] ? "更新我的預測" : "加入此房間並提交預測"}
             </button>
             <p className="submission-note">
-              {joinedRooms[activeRoom.id]
-                ? `你已在此房間提交${joinedRooms[activeRoom.id] === "up" ? "看漲" : "看跌"}。正式版會在截止後鎖定。`
-                : `${activeRoom.deadline}，${activeRoom.verifyAt}。截止前可修改自己的方向。`}
+              {submissionStatus ||
+                (joinedRooms[activeRoom.id]
+                  ? `你已在此房間提交${joinedRooms[activeRoom.id] === "up" ? "看漲" : "看跌"}。截止前可再次提交修改。`
+                  : `${activeRoom.deadline}，${activeRoom.verifyAt}。截止前可修改自己的方向。`)}
             </p>
           </section>
         </div>
@@ -334,7 +399,7 @@ export default function Home() {
               </span>
               <div className="room-meta">
                 <span>{room.deadline}</span>
-                <span>{room.joined + (joinedRooms[room.id] ? 1 : 0)} 人參加</span>
+                <span>{room.joined} 人參加</span>
               </div>
               <div className="room-split" aria-label="目前預測分布">
                 <span className="rise" style={{ width: `${room.bullish}%` }} />
